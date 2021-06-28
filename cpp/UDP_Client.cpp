@@ -1,14 +1,15 @@
 #include "UDP_Client.h"
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
-#define MAX 80
-#define PORT 4455
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#define PORT    4045
+#define MAXLINE 1024
 #define SA struct sockaddr
 
 PREPARE_LOGGING(UDP_Client_i)
@@ -33,48 +34,27 @@ void UDP_Client_i::constructor()
 
 int UDP_Client_i::serviceFunction()
 {
-    char buff[MAX];
-
-        int sockfd;
-        struct sockaddr_in servaddr;
-
-        sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sockfd == -1) {
-                printf("socket creation failed...\n");
-                exit(0);
+	int sockfd;
+        char buffer[MAXLINE];
+        char *hello = "Hello from client";
+        struct sockaddr_in       servaddr;
+        if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+                perror("socket creation failed");
+                exit(EXIT_FAILURE);
         }
         else
-                printf("Socket successfully created..\n");
-        bzero(&servaddr, sizeof(servaddr));
-
+                LOG_INFO(UDP_Client_i, "Socket created successfully");
+        memset(&servaddr, 0, sizeof(servaddr));
         servaddr.sin_family = AF_INET;
-        servaddr.sin_addr.s_addr = inet_addr("172.24.85.101");
         servaddr.sin_port = htons(PORT);
-
-        if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
-                printf("connection with the server failed...\n");
-                exit(0);
-        }
-        else
-                LOG_INFO(UDP_Client_i,"connected to the server..\n");
-
-
-    while(1) {
-            bzero(buff, sizeof(buff));
-            //printf("Enter the string : ");
-            strcpy(buff, "Hello, I am Client");
-            write(sockfd, buff, sizeof(buff));
-            bzero(buff, sizeof(buff));
-            read(sockfd, buff, sizeof(buff));
-            LOG_INFO(UDP_Client_i, "Data Recieved : " << buff);
-            if ((strncmp(buff, "exit", 4)) == 0) {
-                    printf("Client Exit...\n");
-                    break;
-            }
-    }
-
+        servaddr.sin_addr.s_addr = INADDR_ANY;
+        int n, len;
+        sendto(sockfd, (const char *)hello, strlen(hello), MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+        LOG_INFO(UDP_Client_i, "Hello message sent");
+        n = recvfrom(sockfd, (char *)buffer, MAXLINE, MSG_WAITALL, (struct sockaddr *) &servaddr, (socklen_t*)&len);
+        buffer[n] = '\0';
+        LOG_INFO(UDP_Client_i, "Data Recieved : " << buffer);
         close(sockfd);
-
-        return 0;
+	return 0;
 }
 
